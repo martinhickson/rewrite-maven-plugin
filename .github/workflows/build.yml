@@ -8,43 +8,109 @@ on:
         required: true
         default: 'v6.15.0-enhanced'
         type: string
+      create_draft_release:
+        description: 'Create draft release with JARs'
+        required: false
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release tag (e.g., v6.15.0)'
+        required: false
+        type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         java: [ '17' ]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         ref: ${{ github.event.inputs.branch }}
-      
+
     - name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@v4
       with:
         java-version: ${{ matrix.java }}
         distribution: 'temurin'
         cache: 'maven'
-        
+
     - name: Cache Maven packages
       uses: actions/cache@v4
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-m2
-        
+
     - name: Validate POM
       run: mvn validate
-      
+
     - name: Compile
       run: mvn compile
-      
+
     - name: Test
       run: mvn test
-      
+
     - name: Package
       run: mvn package -DskipTests
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: maven-build
+        path: target/
+        retention-days: 1
+
+  create-draft-release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.create_draft_release == 'true' && github.event.inputs.release_tag != '' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.branch }}
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: maven-build
+        path: target/
+
+    - name: Create Draft Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.event.inputs.release_tag }}
+        release_name: Release ${{ github.event.inputs.release_tag }}
+        draft: true
+        prerelease: false
+        body: |
+          ## Release ${{ github.event.inputs.release_tag }}
+
+          This is a draft release created from branch `${{ github.event.inputs.branch }}`.
+
+          ### Artifacts
+          - JAR files from target directory
+
+          ### Build Information
+          - Branch: `${{ github.event.inputs.branch }}`
+          - Workflow: ${{ github.workflow }}
+          - Run ID: ${{ github.run_id }}
+
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./rewrite-maven-plugin/target/rewrite-maven-plugin-*.jar
+        asset_name: ${{ github.event.inputs.release_tag }}-jars
+        asset_content_type: application/java-archive
