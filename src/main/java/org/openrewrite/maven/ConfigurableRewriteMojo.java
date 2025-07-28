@@ -177,6 +177,10 @@ public abstract class ConfigurableRewriteMojo extends AbstractMojo {
     @Parameter(defaultValue = "${plugin}", required = true, readonly = true)
     protected PluginDescriptor pluginDescriptor;
 
+    @Parameter(property = "rewrite.sourceDirectory", alias = "sourceDirectory")
+    @Nullable
+    protected String sourceDirectory;
+
     protected enum State {
         SKIPPED,
         PROCESSED,

@@ -124,8 +124,11 @@ public class MavenMojoProjectParser {
     private final boolean runPerSubmodule;
     private final boolean parseAdditionalResources;
 
+    @Nullable
+    private final String sourceDirectory;
+
     @SuppressWarnings("BooleanParameter")
-    public MavenMojoProjectParser(Log logger, Path baseDir, boolean pomCacheEnabled, @Nullable String pomCacheDirectory, RuntimeInformation runtime, boolean skipMavenParsing, Collection<String> exclusions, Collection<String> plainTextMasks, int sizeThresholdMb, MavenSession session, SettingsDecrypter settingsDecrypter, boolean runPerSubmodule, boolean parseAdditionalResources) {
+    public MavenMojoProjectParser(Log logger, Path baseDir, boolean pomCacheEnabled, @Nullable String pomCacheDirectory, RuntimeInformation runtime, boolean skipMavenParsing, Collection<String> exclusions, Collection<String> plainTextMasks, int sizeThresholdMb, MavenSession session, SettingsDecrypter settingsDecrypter, boolean runPerSubmodule, boolean parseAdditionalResources, @Nullable String sourceDirectory) {
         this.logger = logger;
         this.baseDir = baseDir;
         this.pomCacheEnabled = pomCacheEnabled;
@@ -139,6 +142,7 @@ public class MavenMojoProjectParser {
         this.settingsDecrypter = settingsDecrypter;
         this.runPerSubmodule = runPerSubmodule;
         this.parseAdditionalResources = parseAdditionalResources;
+        this.sourceDirectory = sourceDirectory;
     }
 
     public Stream<SourceFile> listSourceFiles(MavenProject mavenProject, List<NamedStyles> styles,
@@ -411,7 +415,7 @@ public class MavenMojoProjectParser {
         // Some annotation processors output generated sources to the /target directory. These are added for parsing but
         // should be filtered out of the final SourceFile list.
         List<Path> generatedSourcePaths = listJavaSources(mavenProject.getBasedir().toPath().resolve(mavenProject.getBuild().getDirectory()));
-        String mavenSourceDirectory = mavenProject.getBuild().getSourceDirectory();
+        String mavenSourceDirectory = sourceDirectory != null ? sourceDirectory : mavenProject.getBuild().getSourceDirectory();
         List<Path> mainJavaSources = Stream.concat(
                 generatedSourcePaths.stream(),
                 listJavaSources(mavenProject.getBasedir().toPath().resolve(mavenSourceDirectory)).stream()
